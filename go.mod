@@ -1,6 +1,6 @@
 module github.com/gryzlegrizz/testgopackage
 
-go 1.22.1
+go 1.22
 
 require go.mongodb.org/mongo-driver v1.14.0
 
