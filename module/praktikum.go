@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gryzlegrizz/testgopakcage/model"
+	"github.com/gryzlegrizz/testgopackage/model"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -31,30 +31,40 @@ func InsertOneDoc(db string, collection string, doc interface{}) (insertedID int
 	return insertResult.InsertedID
 }
 
-func InsertPresensi(long float64,lat float64, lokasi string, phonenumber string, checkin string, biodata Karyawan) (InsertedID interface{}) {
-	var presensi Presensi
-	presensi.Latitude = long
-	presensi.Longitude = lat
-	presensi.Location = lokasi
-	presensi.Phone_number = phonenumber
-	presensi.Datetime = primitive.NewDateTimeFromTime(time.Now().UTC())
-	presensi.Checkin = checkin
-	presensi.Biodata = biodata
-	return InsertOneDoc("tesdb2024", "presensi", presensi)
+func InsertPresensi(db *mongo.Database, col string, long float64, lat float64, lokasi string, phonenumber string, checkin string, biodata model.Karyawan) (insertedID primitive.ObjectID, err error) {
+	presensi := bson.M{
+		"longitude":    long,
+		"latitude":     lat,
+		"location":     lokasi,
+		"phone_number": phonenumber,
+		"datetime":     primitive.NewDateTimeFromTime(time.Now().UTC()),
+		"checkin":      checkin,
+		"biodata":      biodata,
+	}
+	result, err := db.Collection(col).InsertOne(context.Background(), presensi)
+	if err != nil {
+		fmt.Printf("InsertPresensi: %v\n", err)
+		return
+	}
+	insertedID = result.InsertedID.(primitive.ObjectID)
+	return insertedID, nil
 }
 
-func GetKaryawanFromPhoneNumber(phone_number string) (staf Presensi) {
-	karyawan := MongoConnect("tesdb2024").Collection("presensi")
+func GetKaryawanFromPhoneNumber(phone_number string, db *mongo.Database, col string) (staf model.Presensi, errs error) {
+	karyawan := db.Collection(col)
 	filter := bson.M{"phone_number": phone_number}
 	err := karyawan.FindOne(context.TODO(), filter).Decode(&staf)
 	if err != nil {
-		fmt.Printf("getKaryawanFromPhoneNumber: %v\n", err)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return staf, fmt.Errorf("no data found for phone number %s", phone_number)
+		}
+		return staf, fmt.Errorf("error retrieving data for phone number %s: %s", phone_number, err.Error())
 	}
-	return staf
+	return staf, nil
 }
 
-func GetAllPresensi() (data []Presensi) {
-	karyawan := MongoConnect("tesdb2024").Collection("presensi")
+func GetAllPresensi(db *mongo.Database, col string) (data []model.Presensi) {
+	karyawan := db.Collection(col)
 	filter := bson.M{}
 	cursor, err := karyawan.Find(context.TODO(), filter)
 	if err != nil {
@@ -67,4 +77,18 @@ func GetAllPresensi() (data []Presensi) {
 	return
 }
 
-//TEST v0.0.2
+func GetPresensiFromID(_id primitive.ObjectID, db *mongo.Database, col string) (presensi model.Presensi, errs error) {
+	karyawan := db.Collection(col)
+	filter := bson.M{"_id": _id}
+	err := karyawan.FindOne(context.TODO(), filter).Decode(&presensi)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return presensi, fmt.Errorf("no data found for ID %s", _id)
+		}
+		return presensi, fmt.Errorf("error retrieving data for ID %s: %s", _id, err.Error())
+	}
+	return presensi, nil
+}
+
+
+//TEST v0.0.3
